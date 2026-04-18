@@ -20,7 +20,7 @@ def load_tokens(server_name):
             with open("token_pk.json", "r") as f:
                 tokens = json.load(f)
         elif server_name in {"BD", "IND", "SAC", "NA"}:
-            with open("token_bd.json", "r") as f:
+            with open("token_pk.json", "r") as f:
                 tokens = json.load(f)
         else:
             with open("token_bd.json", "r") as f:
@@ -227,7 +227,7 @@ def handle_requests():
 
             if server_name_used == "PK":
                 url = "https://clientbp.ggblueshark.com/LikeProfile"
-            elif server_name_used in {"BD", "IND", "SAC", "NA"}:
+            elif server_name_used in {"BD", "SAC", "NA"}:
                 url = "https://clientbp.ggblueshark.com/LikeProfile"
             else:
                 url = "https://client.ind.freefiremobile.com/LikeProfile"
