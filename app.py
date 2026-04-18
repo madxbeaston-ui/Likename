@@ -122,7 +122,7 @@ def make_request(encrypt, server_name, token):
     try:
         if server_name == "PK":
             url = "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
-        elif server_name in {"BR", "US", "SAC", "NA"}:
+        elif server_name in {"BD", "IND", "SAC", "NA"}:
             url = "https://client.ind.freefiremobile.com/GetPlayerPersonalShow"
         else:
             url = "https://client.us.freefiremobile.com/GetPlayerPersonalShow"
@@ -227,7 +227,7 @@ def handle_requests():
 
             if server_name_used == "PK":
                 url = "https://clientbp.ggblueshark.com/LikeProfile"
-            elif server_name_used in {"BR", "US", "SAC", "NA"}:
+            elif server_name_used in {"BD", "IND", "SAC", "NA"}:
                 url = "https://client.ind.freefiremobile.com/LikeProfile"
             else:
                 url = "https://client.us.freefiremobile.com/LikeProfile"
