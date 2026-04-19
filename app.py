@@ -23,7 +23,7 @@ def load_tokens(server_name):
         
         # Case 2: IND server loads specifically from token_ind.json
         elif server_name == "IND":
-            with open("token_ind.json", "r") as f:
+            with open("token_pk.json", "r") as f:
                 tokens = json.load(f)
         
         # Case 3: Other regions - Combine tokens from PK and IND files
