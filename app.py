@@ -29,14 +29,12 @@ def load_tokens(server_name):
         # Case 3: Other regions - Combine tokens from PK and IND files
         else:
             tokens = []
-            # Merge tokens from token_pk.json
             try:
                 with open("token_pk.json", "r") as f:
                     tokens.extend(json.load(f))
             except FileNotFoundError:
                 app.logger.warning("token_pk.json not found")
             
-            # Merge tokens from token_ind.json
             try:
                 with open("token_ind.json", "r") as f:
                     tokens.extend(json.load(f))
@@ -56,8 +54,7 @@ def encrypt_message(plaintext):
         padded_message = pad(plaintext, AES.block_size)
         encrypted_message = cipher.encrypt(padded_message)
         return binascii.hexlify(encrypted_message).decode('utf-8')
-    except Exception as e:
-        app.logger.error(f"Error encrypting message: {e}")
+    except Exception:
         return None
 
 def create_protobuf_message(user_id, region):
@@ -66,8 +63,7 @@ def create_protobuf_message(user_id, region):
         message.uid = int(user_id)
         message.region = region
         return message.SerializeToString()
-    except Exception as e:
-        app.logger.error(f"Error creating protobuf message: {e}")
+    except Exception:
         return None
 
 async def send_request(encrypted_uid, token, url):
@@ -75,7 +71,6 @@ async def send_request(encrypted_uid, token, url):
         edata = bytes.fromhex(encrypted_uid)
         headers = {
             'User-Agent': "Dalvik/2.1.0 (Linux; U; Android 9; ASUS_Z01QD Build/PI)",
-            'Connection': "Keep-Alive",
             'Authorization': f"Bearer {token}",
             'Content-Type': "application/x-www-form-urlencoded",
             'X-Unity-Version': "2018.4.11f1",
@@ -83,34 +78,23 @@ async def send_request(encrypted_uid, token, url):
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=edata, headers=headers) as response:
-                if response.status != 200:
-                    return response.status
-                return await response.text()
-    except Exception as e:
-        app.logger.error(f"Exception in send_request: {e}")
+                return response.status
+    except Exception:
         return None
 
 async def send_multiple_requests(uid, server_name, url):
     try:
-        region = server_name
-        protobuf_message = create_protobuf_message(uid, region)
-        if protobuf_message is None:
-            return None
+        protobuf_message = create_protobuf_message(uid, server_name)
         encrypted_uid = encrypt_message(protobuf_message)
-        if encrypted_uid is None:
+        tokens = load_tokens(server_name)
+        if not tokens or not encrypted_uid:
             return None
         tasks = []
-        tokens = load_tokens(server_name)
-        if not tokens:
-            return None
-        # Distribute 100 requests across available tokens
         for i in range(100):
             token = tokens[i % len(tokens)]["token"]
             tasks.append(send_request(encrypted_uid, token, url))
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return results
-    except Exception as e:
-        app.logger.error(f"Exception in send_multiple_requests: {e}")
+        return await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception:
         return None
 
 def create_protobuf(uid):
@@ -119,19 +103,16 @@ def create_protobuf(uid):
         message.saturn_ = int(uid)
         message.garena = 1
         return message.SerializeToString()
-    except Exception as e:
-        app.logger.error(f"Error creating uid protobuf: {e}")
+    except Exception:
         return None
 
 def enc(uid):
-    protobuf_data = create_protobuf(uid)
-    if protobuf_data is None:
-        return None
-    return encrypt_message(protobuf_data)
+    data = create_protobuf(uid)
+    return encrypt_message(data) if data else None
 
 def make_request(encrypt, server_name, token):
     try:
-        # Select info URL based on server logic
+        # URL selection logic based on requested server
         if server_name in {"PK", "BD"}:
             url = "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
         elif server_name == "IND":
@@ -147,19 +128,11 @@ def make_request(encrypt, server_name, token):
             'X-Unity-Version': "2018.4.11f1",
             'ReleaseVersion': "OB53"
         }
-        response = requests.post(url, data=edata, headers=headers, verify=False)
-        return decode_protobuf(response.content)
-    except Exception as e:
-        app.logger.error(f"Error in make_request: {e}")
-        return None
-
-def decode_protobuf(binary):
-    try:
+        response = requests.post(url, data=edata, headers=headers, verify=False, timeout=10)
         items = like_count_pb2.Info()
-        items.ParseFromString(binary)
+        items.ParseFromString(response.content)
         return items
-    except Exception as e:
-        app.logger.error(f"Error decoding Protobuf: {e}")
+    except Exception:
         return None
 
 def fetch_player_info(uid):
@@ -168,43 +141,41 @@ def fetch_player_info(uid):
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            account_info = data.get("AccountInfo", {})
-            return {
-                "Level": account_info.get("AccountLevel", "NA"),
-                "Region": account_info.get("AccountRegion", "NA"),
-                "ReleaseVersion": account_info.get("ReleaseVersion", "NA")
-            }
-        return {"Level": "NA", "Region": "NA", "ReleaseVersion": "NA"}
+            acc = data.get("AccountInfo", {})
+            return {"Level": acc.get("AccountLevel", "NA"), "Region": acc.get("AccountRegion", "NA")}
     except Exception:
-        return {"Level": "NA", "Region": "NA", "ReleaseVersion": "NA"}
+        pass
+    return {"Level": "NA", "Region": "NA"}
 
 @app.route('/like', methods=['GET'])
 def handle_requests():
     uid = request.args.get("uid")
     server_name = request.args.get("server_name", "").upper()
     if not uid or not server_name:
-        return jsonify({"error": "UID and server_name are required"}), 400
+        return jsonify({"error": "Missing UID or server_name"}), 400
 
     try:
-        player_info = fetch_player_info(uid)
-        region = player_info["Region"]
-        
-        # Determine which server name to use based on API result
-        server_name_used = region if (region != "NA" and server_name != region) else server_name
+        # Use strictly the server_name provided by user
+        server_name_used = server_name
 
         tokens = load_tokens(server_name_used)
         if not tokens: 
-            raise Exception("No tokens available for this region.")
+            return jsonify({"error": f"No tokens available for {server_name_used}"}), 500
         
         token = tokens[0]['token']
         encrypted_uid = enc(uid)
-        
-        # Get likes before action
+        if not encrypted_uid: 
+            return jsonify({"error": "Encryption failed"}), 500
+
+        # Initial profile check with safety verification
         before = make_request(encrypted_uid, server_name_used, token)
+        if before is None:
+            return jsonify({"error": "Failed to fetch initial profile data. Check your tokens."}), 500
+
         data_before = json.loads(MessageToJson(before))
         before_like = int(data_before.get('AccountInfo', {}).get('Likes', 0))
 
-        # Determine target API for the like action
+        # Determine target API for liking
         if server_name_used in {"PK", "BD"}:
             like_url = "https://clientbp.ggblueshark.com/LikeProfile"
         elif server_name_used == "IND":
@@ -212,26 +183,32 @@ def handle_requests():
         else:
             like_url = "https://client.us.freefiremobile.com/LikeProfile"
 
-        # Fire off the requests
+        # Fire asynchronous like requests
         asyncio.run(send_multiple_requests(uid, server_name_used, like_url))
 
-        # Get likes after action
+        # Final profile check with safety verification
         after = make_request(encrypted_uid, server_name_used, token)
+        if after is None:
+            return jsonify({"error": "Could not verify final likes. Action may have completed."}), 500
+
         data_after = json.loads(MessageToJson(after))
         after_like = int(data_after.get('AccountInfo', {}).get('Likes', 0))
         
-        result = {
+        # Determine player region for response info
+        player_info = fetch_player_info(uid)
+        
+        return jsonify({
             "LikesGivenByAPI": after_like - before_like,
             "LikesafterCommand": after_like,
             "LikesbeforeCommand": before_like,
             "PlayerNickname": data_after.get('AccountInfo', {}).get('PlayerNickname', ''),
-            "Region": region,
+            "Region": player_info["Region"],
             "Level": player_info["Level"],
             "UID": uid,
             "status": 1 if (after_like - before_like) != 0 else 2
-        }
-        return jsonify(result)
+        })
     except Exception as e:
+        app.logger.error(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
