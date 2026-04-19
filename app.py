@@ -227,7 +227,7 @@ def handle_requests():
 
             if server_name_used == "PK":
                 url = "https://clientbp.ggblueshark.com/LikeProfile"
-            elif server_name_used in {"BD", "SAC", "NA"}:
+            elif server_name_used in {"BD", "SG", "ME", "VN", "ID", "EU"}:
                 url = "https://clientbp.ggblueshark.com/LikeProfile"
             else:
                 url = "https://client.ind.freefiremobile.com/LikeProfile"
