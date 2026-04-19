@@ -17,13 +17,13 @@ app = Flask(__name__)
 def load_tokens(server_name):
     try:
         if server_name == "IND":
-            with open("token_india.json", "r") as f:
+            with open("token_ind.json", "r") as f:
                 tokens = json.load(f)
         elif server_name in {"BD", "SG", "ME", "VN", "ID", "EU", "PK"}:
             with open("token_pk.json", "r") as f:
                 tokens = json.load(f)
         else:
-            with open("token_pk.json", "r") as f:
+            with open("token_ind.json", "r") as f:
                 tokens = json.load(f)
         return tokens
     except Exception as e:
@@ -125,7 +125,7 @@ def make_request(encrypt, server_name, token):
         elif server_name in {"BD", "SG", "ME", "VN", "ID", "EU", "PK"}:
             url = "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
         else:
-            url = "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
+            url = "https://client.ind.freefiremobile.com/GetPlayerPersonalShow"
         edata = bytes.fromhex(encrypt)
         headers = {
             'User-Agent': "Dalvik/2.1.0 (Linux; U; Android 9; ASUS_Z01QD Build/PI)",
@@ -230,7 +230,7 @@ def handle_requests():
             elif server_name_used in {"BD", "SG", "ME", "VN", "ID", "EU", "PK"}:
                 url = "https://clientbp.ggblueshark.com/LikeProfile"
             else:
-                url = "https://clientbp.ggblueshark.com/LikeProfile"
+                url = "https://client.ind.freefiremobile.com/LikeProfile"
 
             asyncio.run(send_multiple_requests(uid, server_name_used, url))
 
