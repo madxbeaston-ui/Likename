@@ -122,7 +122,7 @@ def make_request(encrypt, server_name, token):
     try:
         if server_name == "PK":
             url = "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
-        elif server_name in {"BD", "SAC", "NA"}:
+        elif server_name in {"BD", "SG", "ME", "VN", "ID", "EU"}:
             url = "https://clientbp.ggblueshark.com/GetPlayerPersonalShow"
         else:
             url = "https://client.ind.freefiremobile.com/GetPlayerPersonalShow"
